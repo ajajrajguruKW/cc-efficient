@@ -19,7 +19,7 @@ The skill is content-only — no opinions about *what* you build, just *how the 
 Each team member runs these in Claude Code:
 
 ```
-/plugin marketplace add ajajrajguruKW/cc-efficient
+/plugin marketplace add Kilowott-HQ/cc-efficient
 /plugin install cc-efficient@cc-efficient
 ```
 
