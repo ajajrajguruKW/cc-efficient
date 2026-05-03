@@ -12,9 +12,9 @@ Before you send a prompt, ask: **"What is the model actually doing here?"** Then
 
 | Tier | Model | The task is… | Typical work |
 |---|---|---|---|
-| **Recall** | Haiku | Retrieving — the answer is already in the files | grep/glob, "where is X defined?", listing endpoints, summarising a known file, doc lookups, finding a function's callers |
-| **Transform** | Sonnet | Applying known patterns to known code | Routine refactors, writing tests, adding a hook, single-file bug fixes, security/perf reviews against a checklist, generating boilerplate, format conversions |
-| **Reason** | Opus | Multi-file synthesis, architectural calls, ambiguous requirements | Designing a plugin's structure, coordinating reviews, root-causing cross-file bugs, trade-off decisions, "it depends" answers |
+| **Recall** | Haiku | Retrieving — the answer is already in the files | grep/glob, "where is X defined?", listing endpoints/routes, summarising a known file, doc lookups, finding a function's callers |
+| **Transform** | Sonnet | Applying known patterns to known code | Routine refactors, writing tests, adding a hook/handler/middleware, single-file bug fixes, reviews against a checklist, generating boilerplate, format conversions |
+| **Reason** | Opus | Multi-file synthesis, architectural calls, ambiguous requirements | Designing a system, coordinating reviews, root-causing cross-file bugs, trade-off decisions, "it depends" answers |
 
 **One-line heuristic:** *retrieved → Haiku. applied → Sonnet. decided → Opus.*
 
@@ -23,31 +23,61 @@ Before you send a prompt, ask: **"What is the model actually doing here?"** Then
 ## 2. Before you start a session — 30-second pre-flight
 
 - [ ] **Open Claude Code at the project root**, not your home directory. The fewer files in scope, the cheaper every read.
-- [ ] **Check for a `.claudeignore`**. If missing, add one (template below). Excludes `node_modules/`, `vendor/`, `dist/`, build artifacts, lockfiles. **Highest ROI of anything in this doc.**
+- [ ] **Check for a `.claudeignore`**. If missing, add one (template below). Excludes dependency dirs, build artifacts, lockfiles. **Highest ROI of anything in this doc.**
 - [ ] **Pick the model up front.** Default to Sonnet for routine work. Use `/model opus` only for the planning/architecture phase, then `/model sonnet` once the plan is set.
 - [ ] **One task per session.** Don't carry frontend context into a backend task. Open a new session instead of context-switching.
 - [ ] **If the task is search-only** (just finding things), say so in your prompt — Claude will route to a search subagent instead of doing it on the main thread.
 
 ### `.claudeignore` template
-Drop this in any project root:
+A baseline that covers most stacks. **Add framework-specific patterns for your project** (see notes below):
 
 ```
+# Dependencies
 node_modules/
 vendor/
+.venv/
+venv/
+__pycache__/
+.bundle/
+
+# Build output
 dist/
 build/
+out/
+target/
 .next/
+.nuxt/
+.svelte-kit/
+
+# Caches
 .cache/
+.turbo/
+.parcel-cache/
 coverage/
+
+# Lockfiles & logs
 *.lock
 *.log
+
+# Minified assets
 *.min.js
 *.min.css
+
+# OS / VCS
 .DS_Store
 .git/
-wp-content/uploads/
-wp-content/cache/
 ```
+
+**Add for your stack as needed:**
+- *Python:* `*.pyc`, `.pytest_cache/`, `.mypy_cache/`, `.tox/`
+- *Ruby/Rails:* `tmp/`, `log/`, `storage/`
+- *Go:* `bin/`, `*.test`
+- *Rust:* `target/` (already covered)
+- *PHP/WordPress:* `wp-content/uploads/`, `wp-content/cache/`
+- *Laravel:* `bootstrap/cache/`, `storage/framework/`
+- *Java/Kotlin:* `*.class`, `.gradle/`
+- *iOS/Xcode:* `Pods/`, `DerivedData/`, `*.xcworkspace/`
+- *Generated assets:* anything you'd add to `.gitignore` is usually a candidate
 
 ---
 
@@ -71,29 +101,29 @@ wp-content/cache/
 
 ## 4. Prompt patterns — copy, paste, edit
 
-These templates signal the tier so Claude routes the work correctly.
+These templates signal the tier so Claude routes the work correctly. Substitute the language/framework specifics for your stack.
 
 ### A. Fast lookup (Haiku tier)
 ```
-Quick lookup — no edits. Find every place we call `wc_get_order` in this plugin and list the file:line. That's it.
+Quick lookup — no edits. Find every place we call `userService.getById` in the API package and list the file:line. That's it.
 ```
 *Why it works:* "Quick lookup", "no edits", and "list the file:line" all signal retrieval. Claude will use Grep/Glob and a cheap model.
 
 ### B. Routine implementation (Sonnet tier)
 ```
-Routine task. Add a `before_save` hook on the `Order` class that logs the customer email. Pattern is the same as the existing `before_delete` hook in the same file. Don't refactor anything else.
+Routine task. Add a `beforeSave` hook on the `Order` model that emits a `order.updated` event. Pattern is the same as the existing `beforeDelete` hook in the same file. Don't refactor anything else.
 ```
 *Why it works:* names the pattern to copy, scopes the change, and explicitly forbids drift.
 
 ### C. Bug fix (Sonnet tier)
 ```
-Bug: form submission on /contact returns 403 for logged-out users. Nonce is set in the template. Find the cause and fix only the cause — no surrounding cleanup, no extra error handling.
+Bug: form submission on /contact returns 403 for logged-out users. CSRF token is set in the template. Find the cause and fix only the cause — no surrounding cleanup, no extra error handling.
 ```
 *Why it works:* gives the symptom, the suspected area, and explicitly forbids over-correction.
 
 ### D. Architecture / planning (Opus tier — but switch off after)
 ```
-Design question. We need to add multi-currency support to the checkout. Walk me through the trade-offs of (a) using a WooCommerce extension, (b) writing a custom currency-conversion service, (c) doing it client-side. Don't write code yet — just the trade-offs and your recommendation.
+Design question. We need to add Redis caching to the user-profile endpoint. Walk me through the trade-offs of (a) write-through cache, (b) read-through with TTL, (c) cache-aside with manual invalidation. Don't write code yet — just the trade-offs and your recommendation.
 
 After we agree on the approach, I'll switch to Sonnet for implementation.
 ```
@@ -101,9 +131,9 @@ After we agree on the approach, I'll switch to Sonnet for implementation.
 
 ### E. Code review (delegates to subagents)
 ```
-Run a full review on the files in /wp-content/plugins/our-plugin/. Use the wp-code-review agent so the specialists run in parallel.
+Run a full review on the files in /src/api/orders/. Use our review coordinator agent so the specialists run in parallel.
 ```
-*Why it works:* by name-checking the agent, you ensure the coordinator (Opus) fans out to specialists (Sonnet) — instead of the main thread doing it all on Opus.
+*Why it works:* by name-checking a coordinator agent, you ensure it fans out to specialists (Sonnet) — instead of the main thread doing it all on Opus.
 
 ---
 
@@ -123,14 +153,17 @@ Run a full review on the files in /wp-content/plugins/our-plugin/. Use the wp-co
 
 ## 6. Custom agents — when and how
 
-Use a custom agent when **the same kind of task happens repeatedly** and benefits from a fixed checklist or fixed model tier. Examples (these live in `~/.claude/agents/` per developer):
+Use a custom agent when **the same kind of task happens repeatedly** and benefits from a fixed checklist or fixed model tier.
 
-- `wp-code-review` — Opus coordinator, fans out to 5 Sonnet specialists in parallel
-- `review-security` — Sonnet, PHP security checklist
-- `review-forms-ux` — Sonnet, forms/CRO/GDPR
-- `review-woocommerce` — Sonnet, WC data integrity
-- `review-performance` — Sonnet, DB/queries/assets
-- `review-accessibility` — Sonnet, WCAG 2.1 AA
+**Common patterns that pay off (build for your stack):**
+- A coordinator agent (Opus) that fans out to specialist reviewers (Sonnet) for parallel multi-aspect review
+- `security-review` — language-appropriate vulnerability checks (XSS, injection, auth, secrets)
+- `accessibility-review` — WCAG 2.1 AA, semantic HTML, ARIA (for any frontend)
+- `performance-review` — N+1 queries, caching, asset loading (any backend/frontend)
+- `api-contract-review` — REST/GraphQL schema, breaking changes, versioning
+- `migration-review` — DB migrations, lock-safety, rollback paths
+- `test-writer` — adds tests for a specific function/module against your test framework
+- `dependency-audit` — flags outdated or vulnerable dependencies in your lockfile
 
 **When to write a new one:** if you find yourself prompting "review this file for X" more than 3 times in a week, write an agent. The checklist lives in the agent definition; you stop re-typing it; the agent runs on the right tier automatically.
 
@@ -148,7 +181,7 @@ Use a custom agent when **the same kind of task happens repeatedly** and benefit
 2. **One marathon session per day.** Long sessions = stale context = repeated re-uploads. Restart per task.
 3. **Pasting logs/diffs into chat.** Save to a file, ask Claude to read the file. Files cache; chat content doesn't.
 4. **Editing `CLAUDE.md` mid-session.** Invalidates the prefix cache for the rest of the session. Edit between sessions only.
-5. **No `.claudeignore`.** Every context load reads `node_modules/`. Adding one file pays back forever.
+5. **No `.claudeignore`.** Every context load reads dependency directories. Adding one file pays back forever.
 
 ---
 
@@ -159,6 +192,7 @@ This file is **meant to be edited.** When you find a pattern that works (or one 
 - Use a PR / commit so others see what changed
 - Keep entries short and actionable — no theory, just the rule
 - If a section grows past ~10 lines, it's probably its own skill or agent — extract it
+- Stack-specific tips: add to your team's fork of this repo, or keep them in your team's internal docs — the public version stays neutral
 
 **Owner:** team lead rotates. Whoever notices a pattern is responsible for the edit.
 

@@ -79,24 +79,43 @@ If the user wants to write a new agent, enforce these rules:
 
 ## .claudeignore template
 
-Suggest adding this to any project root that doesn't have one. **Single highest-ROI change** in this skill — affects every context load forever:
+Suggest adding this to any project root that doesn't have one. **Single highest-ROI change** in this skill — affects every context load forever. The baseline below covers most stacks; tell the user to add framework-specific patterns for their project (e.g. Python `__pycache__/`, Rails `tmp/`, Laravel `bootstrap/cache/`, WordPress `wp-content/uploads/`, iOS `Pods/`):
 
 ```
+# Dependencies
 node_modules/
 vendor/
+.venv/
+venv/
+__pycache__/
+.bundle/
+
+# Build output
 dist/
 build/
+out/
+target/
 .next/
+.nuxt/
+.svelte-kit/
+
+# Caches
 .cache/
+.turbo/
+.parcel-cache/
 coverage/
+
+# Lockfiles & logs
 *.lock
 *.log
+
+# Minified assets
 *.min.js
 *.min.css
+
+# OS / VCS
 .DS_Store
 .git/
-wp-content/uploads/
-wp-content/cache/
 ```
 
 ## Anti-patterns to call out
