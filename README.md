@@ -7,9 +7,11 @@ Tiered-model workflow plugin for Claude Code. Routes work to the cheapest model 
 When activated, Claude Code:
 
 - **Classifies every task** as Recall (Haiku) / Transform (Sonnet) / Reason (Opus) and routes to the right model
+- **Auto-classifies prompts** via a `UserPromptSubmit` hook that injects a one-line tier hint into context before each turn — fires once per turn, silent on ambiguous prompts and slash commands
 - **Suggests model switches** when the main thread is over-provisioned (e.g. running grep on Opus)
 - **Delegates pure search/lookup** to Haiku-tier subagents instead of the main thread
-- **Flags cache and session hygiene issues** — long sessions, mid-session `CLAUDE.md` edits, missing `.claudeignore`, pasted logs that should be files
+- **Flags large pastes** — when a prompt looks like a pasted log (>2KB with log markers or many newlines), suggests saving to a file since chat content does not cache
+- **Flags cache and session hygiene issues** — long sessions, mid-session `CLAUDE.md` edits, missing `.claudeignore`
 - **Enforces custom-agent design rules** when you build new agents (single responsibility, pinned `model:`, restricted tools)
 
 The skill is content-only — no opinions about *what* you build, just *how the model resources are spent* building it.
@@ -41,21 +43,23 @@ To deactivate: say "stop efficient" or "normal mode".
 ```
 cc-efficient/
 ├── .claude-plugin/
-│   ├── plugin.json          # plugin manifest (registers the SessionStart hook)
-│   └── marketplace.json     # marketplace entry for sharing
+│   ├── plugin.json             # plugin manifest (registers SessionStart + UserPromptSubmit hooks)
+│   └── marketplace.json        # marketplace entry for sharing
 ├── hooks/
-│   └── cc-efficient-prime.js  # SessionStart hook — primes Claude (does NOT load full skill)
+│   ├── cc-efficient-prime.js     # SessionStart hook — primes Claude (does NOT load full skill)
+│   └── cc-efficient-classify.js  # UserPromptSubmit hook — classifies each prompt and injects a tier hint
 ├── skills/
 │   └── efficient/
-│       └── SKILL.md         # the skill — instructions Claude follows when active
+│       └── SKILL.md            # the skill — instructions Claude follows when active
 └── README.md
 ```
 
-**Two-stage activation:**
-1. **SessionStart hook** runs at every session start and emits a one-line priming message — Claude becomes *aware* the `efficient` skill exists. Negligible context cost.
-2. **Skill loads** only when Claude detects the task needs it (tieiable work, cache hygiene issues, or explicit `/efficient` invocation). The full SKILL.md content does not load until then.
+**Three-stage activation:**
+1. **SessionStart hook** runs once per session and emits a one-line priming message — Claude becomes *aware* the `efficient` skill exists. Negligible context cost.
+2. **UserPromptSubmit hook** runs on every user turn, regex-classifies the prompt into Recall / Transform / Reason, best-effort detects the current model from the transcript, and injects a one-line tier hint into context. Silent on slash commands and ambiguous prompts so it does not become noise.
+3. **Skill loads** only when Claude detects the task needs the full ruleset (tieiable work, cache hygiene issues, or explicit `/efficient` invocation). The full SKILL.md content does not load until then.
 
-This is the "best of both" pattern: every session starts knowing the skill is available, but the full ruleset only loads when actually relevant — keeping context lean.
+This is the "best of both" pattern: every session starts knowing the skill is available, every turn gets a cheap classifier nudge, but the full ruleset only loads when actually relevant — keeping context lean.
 
 ## Customising for your team
 

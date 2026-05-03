@@ -1,7 +1,7 @@
 {
   "name": "cc-efficient",
   "description": "Tiered-model workflow for Claude Code. Routes work to the cheapest model that won't degrade quality, enforces cache + session hygiene, and adds a /efficient slash command.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "AJ - Kilowott",
     "url": "https://github.com/ajajrajguruKW"
